@@ -1,0 +1,12 @@
+[
+  {
+    "id": 1,
+    "tipo": "STRING",
+    "valor": "Maria"
+  },
+  {
+    "id": 2,
+    "tipo": "STRING",
+    "valor": "Vinte e cinco"
+  }
+]
