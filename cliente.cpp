@@ -2,36 +2,39 @@
 #include <cstring>
 #include "banco.h"
 
+#include <windows.h> // IPC do Windows
+#define PIPE_NAME "\\\\.\\pipe\\banco_pipe"
+
+void enviarRequisicao(HANDLE hPipe, const std::string& requisicao) {
+    DWORD bytesEscritos;
+    WriteFile(hPipe, requisicao.c_str(), requisicao.length(), &bytesEscritos, NULL);
+    std::cout << "[CLIENTE] Enviado: " << requisicao << "\n";
+    Sleep(1000); //1000ms
+}
+
 int main() {
     std::cout << "--- SISTEMA DE BANCO DE DADOS (JSON) ---\n";
+
+    HANDLE hPipe;
     
-    inicializarBanco();
-
-    Valor v1, v2, v3, v_update;
-
-    strncpy(v1.str, "Maria", 49);
-    v1.str[49] = '\0';
-    inserirRegistro(1, v1, TIPO_STRING);
-
-    v2.i = 25;
-    inserirRegistro(2, v2, TIPO_INT);
-
-    v3.d = 1500.75;
-    inserirRegistro(3, v3, TIPO_DOUBLE);
-
-    strncpy(v_update.str, "Vinte e cinco", 49);
-    v_update.str[49] = '\0';
-    atualizarRegistro(2, v_update, TIPO_STRING);
-
-    deletarRegistro(3);
-
-    Registro r;
-    if (buscarRegistro(1, &r)) {
-        std::cout << "-> BUSCA ID 1: Tipo " << r.tipo << " | Valor: ";
-        if (r.tipo == TIPO_STRING) std::cout << r.valor.str << "\n";
+    while (true) {
+        hPipe = CreateFileA(PIPE_NAME, GENERIC_WRITE, 0, NULL, OPEN_EXISTING, 0, NULL);
+        if (hPipe != INVALID_HANDLE_VALUE) break; // Conectou!
+        if (GetLastError() != ERROR_PIPE_BUSY) {
+            std::cerr << "Erro ao conectar ao Servidor. Verifique se ele esta rodando.\n";
+            return 1;
+        }
+        if (!WaitNamedPipeA(PIPE_NAME, 20000)) return 1;
     }
 
-    std::cout << "-> Verifique o arquivo 'banco.json' na sua pasta!\n";
+    enviarRequisicao(hPipe, "INSERT 1 STRING Maria");
+    enviarRequisicao(hPipe, "INSERT 2 INT 25");
+    enviarRequisicao(hPipe, "INSERT 3 DOUBLE 1500.75");
+    enviarRequisicao(hPipe, "UPDATE 2 STRING Vinte e cinco");
+    enviarRequisicao(hPipe, "DELETE 3");
+    enviarRequisicao(hPipe, "SELECT 1");
 
+    std::cout << "[CLIENTE] Todas as requisicoes foram enviadas!\n";
+    CloseHandle(hPipe);
     return 0;
 }
