@@ -7,6 +7,7 @@
 //tava dando problema com o Mingw, pelo que pesquisei eh bug do windows....
 // #include <thread> 
 // #include <mutex>  
+using namespace std;
 
 #define PIPE_NAME "\\\\.\\pipe\\banco_pipe"
 
@@ -17,9 +18,9 @@ int totalRegistros = 0;
 CRITICAL_SECTION mutex_banco;
 
 void salvarBancoJson() {
-    std::ofstream arquivo("banco.json");
+    ofstream arquivo("banco.json");
     if (!arquivo.is_open()) {
-        std::cerr << "[BANCO] Erro ao abrir banco.json para escrita.\n";
+        cerr << "[BANCO] Erro ao abrir banco.json para escrita.\n";
         return;
     }
 
@@ -54,7 +55,7 @@ void salvarBancoJson() {
 void inicializarBanco() {
     totalRegistros = 0;
    
-    std::cout << "[BANCO] Inicializado. Memoria limpa.\n";
+    cout << "[BANCO] Inicializado. Memoria limpa.\n";
 }
 
 bool inserirRegistro(int id, Valor valor, TipoDado tipo) {
@@ -70,7 +71,7 @@ bool inserirRegistro(int id, Valor valor, TipoDado tipo) {
     
     totalRegistros++;
     
-    std::cout << "[BANCO] INSERT executado no ID " << id << ".\n";
+    cout << "[BANCO] INSERT executado no ID " << id << ".\n";
     salvarBancoJson(); // Atualiza o JSON
     return true;
 }
@@ -90,7 +91,7 @@ bool atualizarRegistro(int id, Valor novoValor, TipoDado tipo) {
         if (tabela[i].id == id) {
             tabela[i].tipo = tipo;
             tabela[i].valor = novoValor;
-            std::cout << "[BANCO] UPDATE executado no ID " << id << ".\n";
+            cout << "[BANCO] UPDATE executado no ID " << id << ".\n";
             salvarBancoJson(); // Atualiza o JSON
             return true;
         }
@@ -103,7 +104,7 @@ bool deletarRegistro(int id) {
         if (tabela[i].id == id) {
             tabela[i] = tabela[totalRegistros - 1]; // Puxa o último pro buraco
             totalRegistros--;
-            std::cout << "[BANCO] DELETE executado no ID " << id << ".\n";
+            cout << "[BANCO] DELETE executado no ID " << id << ".\n";
             salvarBancoJson(); // Atualiza o JSON
             return true;
         }
@@ -114,23 +115,23 @@ bool deletarRegistro(int id) {
 // Formato exigido para a thread nativa do Windows (DWORD WINAPI)
 DWORD WINAPI processarRequisicao(LPVOID arg) {
     char* comandoStr = (char*)arg;
-    std::string comando(comandoStr);
+    string comando(comandoStr);
     delete[] comandoStr; // Libera a memória da string
 
-    std::istringstream iss(comando);
-    std::string acao;
+    istringstream iss(comando);
+    string acao;
     iss >> acao;
 
     // TRAVA O MUTEX
     EnterCriticalSection(&mutex_banco);
 
     if (acao == "INSERT" || acao == "UPDATE") {
-        int id; std::string tipoStr;
+        int id; string tipoStr;
         iss >> id >> tipoStr;
         Valor v; TipoDado tipo;
 
         if (tipoStr == "STRING") {
-            tipo = TIPO_STRING; std::string resto; std::getline(iss >> std::ws, resto);
+            tipo = TIPO_STRING; string resto; getline(iss >> ws, resto);
             strncpy(v.str, resto.c_str(), 49); v.str[49] = '\0';
         } else if (tipoStr == "INT") {
             tipo = TIPO_INT; iss >> v.i;
@@ -142,16 +143,16 @@ DWORD WINAPI processarRequisicao(LPVOID arg) {
         else atualizarRegistro(id, v, tipo);
         
         // GetCurrentThreadId() pega o ID da thread atual no Windows
-        std::cout << "[THREAD " << GetCurrentThreadId() << "] Resolvido: " << comando << "\n";
+        cout << "[THREAD " << GetCurrentThreadId() << "] Resolvido: " << comando << "\n";
     } 
     else if (acao == "DELETE") {
         int id; iss >> id;
         deletarRegistro(id);
-        std::cout << "[THREAD " << GetCurrentThreadId() << "] Resolvido: " << comando << "\n";
+        cout << "[THREAD " << GetCurrentThreadId() << "] Resolvido: " << comando << "\n";
     }
     else if (acao == "SELECT") {
         int id; iss >> id; Registro r;
-        if (buscarRegistro(id, &r)) std::cout << "[THREAD " << GetCurrentThreadId() << "] Busca resolvida: ID " << id << "\n";
+        if (buscarRegistro(id, &r)) cout << "[THREAD " << GetCurrentThreadId() << "] Busca resolvida: ID " << id << "\n";
     }
     
     // DESTRAVA O MUTEX
@@ -165,7 +166,7 @@ int main() {
     // Inicia a variável do Mutex do Windows
     InitializeCriticalSection(&mutex_banco);
 
-    std::cout << "[SERVIDOR] Aguardando req pipe e thread...\n";
+    cout << "[SERVIDOR] Aguardando req pipe e thread...\n";
 
     HANDLE hPipe = CreateNamedPipeA(PIPE_NAME, PIPE_ACCESS_DUPLEX, PIPE_TYPE_MESSAGE | PIPE_READMODE_MESSAGE | PIPE_WAIT, PIPE_UNLIMITED_INSTANCES, 512, 512, 0, NULL);
     if (hPipe == INVALID_HANDLE_VALUE) return 1;
