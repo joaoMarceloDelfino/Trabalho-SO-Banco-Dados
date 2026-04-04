@@ -30,9 +30,14 @@ int main() {
     enviarRequisicao(hPipe, "INSERT 1 STRING Maria");
     enviarRequisicao(hPipe, "INSERT 2 INT 25");
     enviarRequisicao(hPipe, "INSERT 3 DOUBLE 1500.75");
+    enviarRequisicao(hPipe, "SELECT 2");
     enviarRequisicao(hPipe, "UPDATE 2 STRING Vinte e cinco");
+    enviarRequisicao(hPipe, "SELECT 2");
     enviarRequisicao(hPipe, "DELETE 3");
     enviarRequisicao(hPipe, "SELECT 1");
+    enviarRequisicao(hPipe, "SELECT 3");
+
+
 
     std::cout << "[CLIENTE] Todas as requisicoes foram enviadas!\n";
     CloseHandle(hPipe);
