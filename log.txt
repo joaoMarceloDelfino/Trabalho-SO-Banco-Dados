@@ -1,0 +1,17 @@
+[THREAD 17940] Resolvido: INSERT 1 STRING Maria
+[THREAD 29996] Resolvido: INSERT 2 INT 25
+[THREAD 28696] Resolvido: INSERT 3 DOUBLE 1500.75
+[THREAD 29920] Busca resolvida: ID 2 | Valor: 25 (INT)
+[THREAD 17940] Resolvido: UPDATE 2 STRING Vinte e cinco
+[THREAD 29996] Busca resolvida: ID 2 | Valor: Vinte e cinco (STRING)
+[THREAD 28696] Resolvido: DELETE 3
+[THREAD 29920] Busca resolvida: ID 1 | Valor: Maria (STRING)
+[THREAD 17940] Busca falhou: ID 3 nao encontrado.
+[THREAD 25732] Resolvido: INSERT 1 STRING Maria
+[THREAD 26576] Resolvido: INSERT 2 INT 25
+[THREAD 11432] Resolvido: INSERT 3 DOUBLE 1500.75
+[THREAD 29720] Busca resolvida: ID 2 | Valor: 25 (INT)
+[THREAD 25732] Resolvido: UPDATE 2 STRING Vinte e cinco
+[THREAD 26576] Busca resolvida: ID 2 | Valor: Vinte e cinco (STRING)
+[THREAD 11432] Busca resolvida: ID 1 | Valor: Maria (STRING)
+[THREAD 29720] Busca resolvida: ID 3 | Valor: 1500.75 (DOUBLE)

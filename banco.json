@@ -8,5 +8,10 @@
     "id": 2,
     "tipo": "STRING",
     "valor": "Vinte e cinco"
+  },
+  {
+    "id": 3,
+    "tipo": "DOUBLE",
+    "valor": 1500.75
   }
 ]

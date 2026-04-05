@@ -1,7 +1,6 @@
 #include <iostream>
 #include <cstring>
 #include "banco.h"
-
 #include <windows.h> // IPC do Windows
 #define PIPE_NAME "\\\\.\\pipe\\banco_pipe"
 

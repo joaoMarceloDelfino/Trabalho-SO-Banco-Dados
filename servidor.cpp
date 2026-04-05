@@ -17,12 +17,25 @@ using namespace std;
 Registro tabela[MAX_REGISTROS];
 int totalRegistros = 0;
 
-// Mutex nativo do Windows (Equivalente ao pthread_mutex_t)
-CRITICAL_SECTION mutex_banco;
+// SRWLOCK: Permite múltiplas leituras simultâneas, mas escrita exclusiva!
+SRWLOCK lock_banco;
 
 queue<string> fila_requisicoes; // Fila onde o main() vai colocar os comandos
 CRITICAL_SECTION mutex_fila;    // Mutex exclusivo para proteger a fila
 CONDITION_VARIABLE cv_fila;     // Variável para fazer as threads dormirem/acordarem
+
+// Mutex para não bagunçar o arquivo de Log se duas threads escreverem juntas
+CRITICAL_SECTION mutex_log;
+
+void gravarLog(const string& mensagem) {
+    EnterCriticalSection(&mutex_log);
+    ofstream arquivo("log.txt", ios::app); // ios::app para adicionar ao final
+    if (arquivo.is_open()) {
+        arquivo << mensagem << "\n";
+        arquivo.close();
+    }
+    LeaveCriticalSection(&mutex_log);
+}
 
 void salvarBancoJson() {
     ofstream arquivo("banco.json");
@@ -125,21 +138,19 @@ DWORD WINAPI threadDoPool(LPVOID arg) {
         string comando;
         
         EnterCriticalSection(&mutex_fila); // Trava a fila
-        
+
         while (fila_requisicoes.empty()) {
             SleepConditionVariableCS(&cv_fila, &mutex_fila, INFINITE);
         }
-        
+
         comando = fila_requisicoes.front();
         fila_requisicoes.pop();
-        
+
         LeaveCriticalSection(&mutex_fila); // Destrava a fila para o main() poder adicionar mais
-       
+
         istringstream iss(comando);
         string acao;
         iss >> acao;
-
-        EnterCriticalSection(&mutex_banco);
 
         if (acao == "INSERT" || acao == "UPDATE") {
             int id; string tipoStr;
@@ -155,40 +166,52 @@ DWORD WINAPI threadDoPool(LPVOID arg) {
                 tipo = TIPO_DOUBLE; iss >> v.d;
             }
 
+            // ESCRITA: Bloqueia totalmente o banco para outras threads!
+            AcquireSRWLockExclusive(&lock_banco);
             if (acao == "INSERT") inserirRegistro(id, v, tipo);
             else atualizarRegistro(id, v, tipo);
+            ReleaseSRWLockExclusive(&lock_banco);
             
-            cout << "[THREAD " << GetCurrentThreadId() << "] Resolvido: " << comando << "\n";
+            // Monta resposta e salva log
+            ostringstream resp;
+            resp << "[THREAD " << GetCurrentThreadId() << "] Resolvido: " << comando;
+            cout << resp.str() << "\n";
+            gravarLog(resp.str());
         } 
         else if (acao == "DELETE") {
             int id; iss >> id;
-            deletarRegistro(id);
-            cout << "[THREAD " << GetCurrentThreadId() << "] Resolvido: " << comando << "\n";
-        }
-       else if (acao == "SELECT") {
-            int id; 
-            iss >> id; 
-            Registro r;
             
-            if (buscarRegistro(id, &r)) {
-                cout << "[THREAD " << GetCurrentThreadId() << "] Busca resolvida: ID " << id << " | Valor: ";
-                
-                if (r.tipo == TIPO_INT) {
-                    cout << r.valor.i << " (INT)\n";
-                } 
-                else if (r.tipo == TIPO_DOUBLE) {
-                    cout << r.valor.d << " (DOUBLE)\n";
-                } 
-                else if (r.tipo == TIPO_STRING) {
-                    cout << r.valor.str << " (STRING)\n";
-                }
-            } 
-            else {
-                cout << "[THREAD " << GetCurrentThreadId() << "] Busca falhou: ID " << id << " nao encontrado.\n";
-            }
+            // ESCRITA: Bloqueia totalmente
+            AcquireSRWLockExclusive(&lock_banco);
+            deletarRegistro(id);
+            ReleaseSRWLockExclusive(&lock_banco);
+
+            ostringstream resp;
+            resp << "[THREAD " << GetCurrentThreadId() << "] Resolvido: " << comando;
+            cout << resp.str() << "\n";
+            gravarLog(resp.str());
         }
-        
-        LeaveCriticalSection(&mutex_banco);
+        else if (acao == "SELECT") {
+            int id; iss >> id; Registro r;
+            
+            // LEITURA: Deixa várias threads lerem ao mesmo tempo!
+            AcquireSRWLockShared(&lock_banco);
+            bool achou = buscarRegistro(id, &r);
+            ReleaseSRWLockShared(&lock_banco);
+            
+            ostringstream resp;
+            if (achou) {
+                resp << "[THREAD " << GetCurrentThreadId() << "] Busca resolvida: ID " << id << " | Valor: ";
+                if (r.tipo == TIPO_INT) resp << r.valor.i << " (INT)";
+                else if (r.tipo == TIPO_DOUBLE) resp << r.valor.d << " (DOUBLE)";
+                else if (r.tipo == TIPO_STRING) resp << r.valor.str << " (STRING)";
+            } else {
+                resp << "[THREAD " << GetCurrentThreadId() << "] Busca falhou: ID " << id << " nao encontrado.";
+            }
+            
+            cout << resp.str() << "\n";
+            gravarLog(resp.str());
+        }
     }
     return 0;
 }
@@ -196,9 +219,10 @@ DWORD WINAPI threadDoPool(LPVOID arg) {
 int main() {
     inicializarBanco();
 
-    // Inicia a variável do Mutex do Windows
-    InitializeCriticalSection(&mutex_banco);
+    // Inicializa SRWLOCK (Banco), Mutexes (Fila e Log) e Variável de Condição
+    InitializeSRWLock(&lock_banco);
     InitializeCriticalSection(&mutex_fila);
+    InitializeCriticalSection(&mutex_log);
     InitializeConditionVariable(&cv_fila);
 
    // CRIA AS THREADS DO POOL (ex: 4 threads) UMA ÚNICA VEZ
@@ -238,7 +262,7 @@ int main() {
     }
     
    
-    DeleteCriticalSection(&mutex_banco);
+    DeleteCriticalSection(&mutex_log);
     DeleteCriticalSection(&mutex_fila);
     CloseHandle(hPipe);
     return 0;
